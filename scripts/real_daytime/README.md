@@ -37,7 +37,9 @@ cus
 off
 ```
 
-**FOR THE REAL TIME SYSTEM WORK, THIS PROPERTY MUST BE SET IN YOUR MAP AS EITHER SYNC OR CUS**
+**FOR THE REAL TIME SYSTEM WORK, THIS PROPERTY MUST BE SET IN YOUR MAP AS EITHER SYNC,CUS OR OFF**
+
+**IF Ambient_day_night DOES NOT EXIST OR CONTAINS AN INVALID VALUE, IT HAD NOT AFFECTED THE AREA IN ANY WAY.**
 
 ### sync
 
@@ -74,7 +76,7 @@ This allows each map to have an independent timezone based in original real time
 
 ### off
 
-Disables the day and night system for that area.
+Disables the day and night visual changes system for that area.
 
 Example:
 
@@ -82,9 +84,7 @@ Example:
 Ambient_day_night = off
 ```
 
-When disabled, the system restores the area's original foreground and clears the generated time properties.
-
-If `Ambient_day_night` does not exist or contains an invalid value, the area is treated as `off`.
+When off, the system generatetime properties but doesnt apply visual changes.
 
 ## Ambient_timezone
 
