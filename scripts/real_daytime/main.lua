@@ -246,15 +246,6 @@ end
 
 -- AUTOMATIC UPDATE
 Net:on("tick", function()
-
-for area_id, _ in pairs(ambient_areas) do
-  update_area(area_id)
-
-  local day_time = Net.get_area_custom_property(area_id, "Day_time")
-
-  print("[real_daytime] Area: " .. area_id .. " | Day_time: " .. tostring(day_time))
-end
-
   local current_minute = os.date("%Y-%m-%d %H:%M")
 
   if current_minute == last_update_minute then return end
