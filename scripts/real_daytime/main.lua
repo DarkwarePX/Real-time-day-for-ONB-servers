@@ -8,9 +8,9 @@ local AmbientManage = {}
 
 local ambient_areas = {}
 
-local dawn_texture = "/server/assets/HP_Manager/real_daytime/dawn.png"
-local morning_texture = "/server/assets/HP_Manager/real_daytime/morning.png"
-local night_texture = "/server/assets/HP_Manager/real_daytime/night.png"
+local dawn_texture = "/server/assets/real_daytime/dawn.png"
+local morning_texture = "/server/assets/real_daytime/morning.png"
+local night_texture = "/server/assets/real_daytime/night.png"
 
 local dawn_start_time = 1
 local morning_start_time = 6 * 60 + 1
@@ -25,6 +25,7 @@ local valid_day_night_modes = {
   off = true
 }
 
+
 -- AREA SETTINGS
 local function get_area_settings(area_id)
   local settings = ambient_areas[area_id]
@@ -35,21 +36,20 @@ local function get_area_settings(area_id)
 
   local mode = Net.get_area_custom_property(area_id, "Ambient_day_night")
 
-  if mode ~= nil then
-    mode = mode:lower()
-  end
+  if mode == nil then return nil end
 
-  if mode == nil or not valid_day_night_modes[mode] then
-    mode = "off"
-  end
+  mode = mode:lower()
+
+  if not valid_day_night_modes[mode] then return nil end
 
   local timezone_offset = nil
 
-  if mode == "cus" then
+  if mode == "cus" or mode == "off" then
     timezone_offset = tonumber(Net.get_area_custom_property(area_id, "Ambient_timezone"))
 
     if timezone_offset == nil or timezone_offset < -840 or timezone_offset > 840 then
-      mode = "off"
+      if mode == "cus" then return nil end
+
       timezone_offset = nil
     end
   end
@@ -80,17 +80,14 @@ end
 
 -- CURRENT TIME
 local function get_current_time(settings)
-  if settings.day_night_mode == "sync" then
-    return os.date("*t")
-  end
-
-  if settings.day_night_mode == "cus" then
+  if settings.day_night_mode == "cus"
+      or (settings.day_night_mode == "off" and settings.timezone_offset ~= nil) then
     local timestamp = os.time()
 
     return os.date("!*t", timestamp + settings.timezone_offset * 60)
   end
 
-  return nil
+  return os.date("*t")
 end
 
 -- DAY PHASE
@@ -154,14 +151,13 @@ local function apply_day_phase(area_id, settings, phase)
 end
 
 -- CLEAN DAY PROPERTIES IF AMBIENT_DAY_NIGHT IS TOGGLED OFF
-  local properties = {
-    "Day_time",
-    "Day_date",
-    "Day_type"
-  }
+local properties = {
+  "Day_time",
+  "Day_date",
+  "Day_type"
+}
 
 local function clear_day_properties(area_id)
-
   for _, property in ipairs(properties) do
     local value = Net.get_area_custom_property(area_id, property)
 
@@ -171,28 +167,14 @@ local function clear_day_properties(area_id)
   end
 end
 
+
 -- UPDATE AREA
 local function update_area(area_id)
   local settings = get_area_settings(area_id)
 
-  if settings.day_night_mode == "off" then
-    if settings.current_phase ~= nil then
-      restore_foreground(area_id, settings)
-      settings.current_phase = nil
-    end
-
-    clear_day_properties(area_id)
-
-    settings.current_date = nil
-
-    return
-  end
+  if settings == nil then return end
 
   local time = get_current_time(settings)
-
-  if time == nil then
-    return
-  end
 
   local date = get_day_date(time)
 
@@ -205,13 +187,13 @@ local function update_area(area_id)
 
   local phase = get_day_phase(time)
 
-  if phase == settings.current_phase then
-    return
-  end
+  if phase == settings.current_phase then return end
 
   Net.set_area_custom_property(area_id, "Day_time", phase)
 
-  apply_day_phase(area_id, settings, phase)
+  if settings.day_night_mode ~= "off" then
+    apply_day_phase(area_id, settings, phase)
+  end
 
   settings.current_phase = phase
 end
@@ -221,6 +203,7 @@ function AmbientManage.refresh_area(area_id)
   local old_settings = ambient_areas[area_id]
 
   if old_settings ~= nil
+      and old_settings.day_night_mode ~= "off"
       and old_settings.current_phase ~= nil
       and old_settings.current_phase ~= "afternoon" then
     restore_foreground(area_id, old_settings)
@@ -229,11 +212,17 @@ function AmbientManage.refresh_area(area_id)
   ambient_areas[area_id] = nil
 
   update_area(area_id)
+
+  if ambient_areas[area_id] == nil then
+    clear_day_properties(area_id)
+  end
 end
 
 -- GET DAY/NIGHT MODE
 function AmbientManage.get_day_night_mode(area_id)
   local settings = get_area_settings(area_id)
+
+  if settings == nil then return nil end
 
   return settings.day_night_mode
 end
@@ -241,6 +230,8 @@ end
 -- GET TIMEZONE
 function AmbientManage.get_timezone(area_id)
   local settings = get_area_settings(area_id)
+
+  if settings == nil then return nil end
 
   return settings.timezone_offset
 end
@@ -255,6 +246,15 @@ end
 
 -- AUTOMATIC UPDATE
 Net:on("tick", function()
+
+for area_id, _ in pairs(ambient_areas) do
+  update_area(area_id)
+
+  local day_time = Net.get_area_custom_property(area_id, "Day_time")
+
+  print("[real_daytime] Area: " .. area_id .. " | Day_time: " .. tostring(day_time))
+end
+
   local current_minute = os.date("%Y-%m-%d %H:%M")
 
   if current_minute == last_update_minute then return end
